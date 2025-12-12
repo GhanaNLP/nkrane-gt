@@ -14,12 +14,14 @@ class AkanDict:
         self.headers = headers
         self.session = requests.Session()
         self.session.headers.update(headers)
+        self.failed_urls = []
 
     def get_html(self, url):
         response = self.session.get(url, timeout=10)
         if response.status_code == 200:
             return response.content
         else:
+            self.failed_urls.append(url)
             raise ValueError(
                 f"Failed to retrieve page. Status code: {response.status_code}"
             )
@@ -86,10 +88,9 @@ class AkanDict:
                         word_data["part_of_speech"] = text.replace(
                             "Part of speech:", ""
                         ).strip()
-                    elif text.startswith("English Translation:"):
-                        word_data["english_word"] = text.replace(
-                            "English Translation:", ""
-                        ).strip()
+                    elif "english" in text.lower():
+                        english_word = text.split(":", maxsplit=1)
+                        word_data["english_word"] = english_word[1].strip()
 
             return word_data
 
@@ -116,9 +117,15 @@ class AkanDict:
         df = pd.DataFrame(
             dictionary, columns=["english_word", "twi_word", "part_of_speech"]
         )
+        df = df.sort_values("english_word").reset_index(drop=True)
         df.to_csv("./eng_akan_dict.csv", index=False)
 
         print(f"Dictionary saved! Total entries: {len(df)}")
+
+        if self.failed_urls:
+            print(" Failed to scrape:")
+            for url in self.failed_urls:
+                print(f"  - {url}")
 
 
 if __name__ == "__main__":
