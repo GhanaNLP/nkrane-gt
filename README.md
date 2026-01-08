@@ -127,18 +127,4 @@ id,term,translation
 4,acreage,asase kɛse
 ```
 
-## CLI Usage
-
-You can also use the command line interface:
-
-```bash
-# List available languages and their terminology files
-ghana-translator list
-
-# Translate text using terminology
-ghana-translator translate "The farmer uses modern equipment" --target twi
-
-# Export terminology to JSON
-ghana-translator export twi
-```
 ```
