@@ -13,162 +13,96 @@ class Term:
     id: int
     term: str
     translation: str
-    domain: str
-    language: str
-    google_lang_code: str  # Add Google-compatible language code
+    google_lang_code: str  # Google-compatible language code
 
 class TerminologyManager:
-    def __init__(self, terminologies_dir: str = None):
-        """Initialize terminology manager.
+    def __init__(self, csv_path: str = None):
+        """Initialize terminology manager with a single CSV file.
         
         Args:
-            terminologies_dir: Directory containing terminology CSV files.
-                               Defaults to package's terminologies directory.
+            csv_path: Path to the terminology CSV file. 
+                     Defaults to 'terminologies_{lang}.csv' in current directory.
+                     If None, looks for terminologies_{lang}.csv in repo root.
         """
-        if terminologies_dir is None:
-            # Default to package directory
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            self.terminologies_dir = os.path.join(current_dir, 'terminologies')
-        else:
-            self.terminologies_dir = terminologies_dir
-            
-        self.terms_by_domain_lang = defaultdict(dict)
-        self.domains_languages = set()
-        self.available_google_languages = set()
+        self.csv_path = csv_path
+        self.terms = {}  # Dictionary of terms for the language
+        self.language = None
+        self.google_lang_code = None
         self._load_terminologies()
     
+    def _find_terminology_file(self) -> str:
+        """Find the terminology CSV file."""
+        if self.csv_path and os.path.exists(self.csv_path):
+            return self.csv_path
+            
+        # Look for terminologies_*.csv in current directory
+        current_dir = os.getcwd()
+        for filename in os.listdir(current_dir):
+            if filename.startswith('terminologies_') and filename.endswith('.csv'):
+                return os.path.join(current_dir, filename)
+        
+        # Look in parent directory (in case we're in a subdirectory)
+        parent_dir = os.path.dirname(current_dir)
+        for filename in os.listdir(parent_dir):
+            if filename.startswith('terminologies_') and filename.endswith('.csv'):
+                return os.path.join(parent_dir, filename)
+        
+        raise FileNotFoundError(
+            "No terminology CSV file found. Looking for 'terminologies_{lang}.csv' "
+            f"in {current_dir} or {parent_dir}"
+        )
+    
     def _load_terminologies(self):
-        """Load all terminology files from the terminologies directory."""
-        if not os.path.exists(self.terminologies_dir):
-            raise FileNotFoundError(
-                f"Terminologies directory not found: {self.terminologies_dir}"
+        """Load terminology from the CSV file."""
+        csv_file = self._find_terminology_file()
+        
+        # Extract language from filename (terminologies_lang.csv)
+        basename = os.path.basename(csv_file)
+        language = basename.replace('terminologies_', '').replace('.csv', '')
+        
+        self.language = language
+        self.google_lang_code = convert_lang_code(language, to_google=True)
+        
+        # Check if Google Translate supports this language
+        if not is_google_supported(language):
+            print(f"Warning: Language '{language}' may not be fully supported by Google Translate")
+            print(f"  Using code: '{self.google_lang_code}' for Google Translate")
+        
+        # Load the CSV file
+        df = pd.read_csv(csv_file)
+        
+        # Create terms dictionary
+        self.terms = {}
+        for _, row in df.iterrows():
+            term_id = int(row['id'])
+            term = Term(
+                id=term_id,
+                term=str(row['term']).lower().strip(),
+                translation=str(row['translation']),
+                google_lang_code=self.google_lang_code
             )
-        
-        # Pattern for terminology files: {domain}_terms_{language}.csv
-        pattern = re.compile(r'(.+)_terms_(.+)\.csv$')
-        
-        for filename in os.listdir(self.terminologies_dir):
-            match = pattern.match(filename)
-            if match:
-                domain, language = match.groups()
-                
-                # Convert language code to Google format
-                google_lang_code = convert_lang_code(language, to_google=True)
-                
-                # Check if Google Translate supports this language
-                if not is_google_supported(language):
-                    print(f"Warning: Language '{language}' may not be fully supported by Google Translate")
-                    print(f"  Using code: '{google_lang_code}' for Google Translate")
-                
-                self.domains_languages.add((domain, language))
-                self.available_google_languages.add(google_lang_code)
-                
-                filepath = os.path.join(self.terminologies_dir, filename)
-                df = pd.read_csv(filepath)
-                
-                # Create a dictionary of terms for quick lookup
-                terms_dict = {}
-                for _, row in df.iterrows():
-                    term_id = int(row['id'])
-                    term = Term(
-                        id=term_id,
-                        term=str(row['term']).lower().strip(),
-                        translation=str(row['translation']),
-                        domain=domain,
-                        language=language,
-                        google_lang_code=google_lang_code
-                    )
-                    terms_dict[term.term] = term
-                
-                self.terms_by_domain_lang[(domain, language)] = terms_dict
+            self.terms[term.term] = term
     
-    def get_available_domains_languages(self) -> List[Tuple[str, str]]:
-        """Get list of available (domain, language) pairs."""
-        return sorted(self.domains_languages)
+    def get_google_lang_code(self, language: str = None) -> str:
+        """Get Google-compatible language code."""
+        if language and language != self.language:
+            return convert_lang_code(language, to_google=True)
+        return self.google_lang_code
     
-    def get_available_domains_languages_google(self) -> List[Tuple[str, str]]:
-        """Get list of available (domain, language) pairs with Google language codes."""
-        result = []
-        for domain, lang in self.domains_languages:
-            google_lang = convert_lang_code(lang, to_google=True)
-            result.append((domain, google_lang))
-        return sorted(result)
-    
-    def get_domains(self) -> List[str]:
-        """Get list of available domains."""
-        return sorted({d for d, _ in self.domains_languages})
-    
-    def get_languages(self, format: str = 'original') -> List[str]:
-        """Get list of available languages.
-        
-        Args:
-            format: 'original' for original codes, 'google' for Google codes
-        """
-        languages = {l for _, l in self.domains_languages}
-        
-        if format == 'google':
-            return sorted({convert_lang_code(l, to_google=True) for l in languages})
-        else:
-            return sorted(languages)
-    
-    def get_terms_for_domain_lang(self, domain: str, language: str) -> Dict[str, Term]:
-        """Get all terms for a specific domain and language.
-        
-        Args:
-            domain: Domain name
-            language: Language code (can be 2-letter or 3-letter)
-        """
-        # Try exact match first
-        if (domain, language) in self.terms_by_domain_lang:
-            return self.terms_by_domain_lang[(domain, language)]
-        
-        # If language is 2-letter, try to find matching 3-letter code
-        if len(language) == 2:
-            for (d, l), terms in self.terms_by_domain_lang.items():
-                if d == domain and convert_lang_code(l, to_google=True) == language:
-                    return terms
-        
-        # If language is 3-letter, try to convert to Google code and find
-        if len(language) == 3:
-            google_code = convert_lang_code(language, to_google=True)
-            for (d, l), terms in self.terms_by_domain_lang.items():
-                if d == domain and convert_lang_code(l, to_google=True) == google_code:
-                    return terms
-        
-        return {}
-    
-    def get_google_lang_code(self, language: str) -> str:
-        """Get Google-compatible language code for a given language code."""
-        return convert_lang_code(language, to_google=True)
-    
-    def preprocess_text(self, text: str, domain: str, language: str) -> Tuple[str, Dict[str, Term]]:
+    def preprocess_text(self, text: str) -> Tuple[str, Dict[str, Term]]:
         """Replace terms in text with their IDs.
         
         Args:
             text: Input text
-            domain: Domain name
-            language: Target language (2-letter or 3-letter code)
             
         Returns:
             Tuple of (preprocessed_text, id_to_term_mapping)
         """
-        terms_dict = self.get_terms_for_domain_lang(domain, language)
-        if not terms_dict:
-            # Try to find if domain exists with different language code
-            available_domains = self.get_domains()
-            if domain in available_domains:
-                available_langs = [l for d, l in self.domains_languages if d == domain]
-                raise ValueError(
-                    f"No terminology found for domain '{domain}' and language '{language}'. "
-                    f"Available languages for '{domain}': {available_langs}"
-                )
-            else:
-                raise ValueError(
-                    f"Domain '{domain}' not found. Available domains: {available_domains}"
-                )
+        if not self.terms:
+            raise ValueError(f"No terminology loaded for language '{self.language}'")
         
         # Sort terms by length (longest first) to handle compound terms
-        sorted_terms = sorted(terms_dict.values(), key=lambda x: len(x.term), reverse=True)
+        sorted_terms = sorted(self.terms.values(), key=lambda x: len(x.term), reverse=True)
         
         preprocessed_text = text
         replacements = {}  # Map of placeholder to term
