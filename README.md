@@ -12,7 +12,7 @@ A Python package that extends Google Translate with terminology control and augm
 bash
 
 ```
-git clone https://github.com/GhanaNLP/tc-translate.git
+git clone https://github.com/GhanaNLP/ghana-translator.git
 cd tc-translate
 pip install -e .
 ```
@@ -24,7 +24,7 @@ Or install directly:
 bash
 
 ```
-pip install git+https://github.com/GhanaNLP/tc-translate.git
+pip install git+https://github.com/GhanaNLP/ghana-translator.git
 ```
 
 
@@ -38,7 +38,7 @@ import asyncio
 from tc_translate import TCTranslator
 
 async def main():
-    translator = TCTranslator(domain='agric', target_lang='ak')
+    translator = TCTranslator(domain='agric', target_lang='ak') # or use target_lang='ee' for Ewe and target_lang='gaa' for Ga
     result = await translator._translate_async("The farmer uses an abattoir and acreage for farming.")
     print(result['text'])
 
