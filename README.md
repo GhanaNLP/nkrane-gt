@@ -167,7 +167,7 @@ Nkrane supports all languages available in Google Translate. For African languag
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions!
 
 ## Citation
 
