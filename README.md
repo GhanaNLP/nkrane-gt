@@ -59,25 +59,7 @@ translator = NkraneTranslator(target_lang='ak')
 result = translator.translate("I want to buy a house and a car.")
 print(result['text'])
 # Output: "Me pɛ sɛ metɔ efie ne kar."
-INFO:nkrane_gt.translator:Terminology loaded: 446281 total terms (446281 built-in, 0 user)
 
-Mepɛ sɛ metɔ efie ne kaa.
-{
-  "text": "Mepɛ sɛ metɔ efie ne kaa.",
-  "src": "en",
-  "dest": "ak",
-  "original": "I want to buy a house and a car.",
-  "preprocessed": "I want to buy a <2> and a <1>.",
-  "google_translation": "Mepɛ sɛ metɔ <2> ne <1>.",
-  "replacements_count": 2,
-  "src_google": "en",
-  "dest_google": "ak",
-  "replaced_terms": [
-    "<1>",
-    "<2>"
-  ],
-  "translation_time": 0.6670994758605957
-}
 ```
 
 ### With Custom Terminology
