@@ -2,6 +2,7 @@
 """
 Script to convert CSV terminology files to pickle dictionary files.
 Usage: python convert_csv_to_pickle.py <csv_file> <language_code>
+python3 convert_csv_to_pickle.py nouns_ak.csv ak
 """
 
 import csv
