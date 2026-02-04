@@ -1,0 +1,15 @@
+README.md
+setup.py
+nkrane_gt/__init__.py
+nkrane_gt/cli.py
+nkrane_gt/language_codes.py
+nkrane_gt/terminology_manager.py
+nkrane_gt/translator.py
+nkrane_gt/utils.py
+nkrane_gt.egg-info/PKG-INFO
+nkrane_gt.egg-info/SOURCES.txt
+nkrane_gt.egg-info/dependency_links.txt
+nkrane_gt.egg-info/entry_points.txt
+nkrane_gt.egg-info/requires.txt
+nkrane_gt.egg-info/top_level.txt
+nkrane_gt/data/nouns_ak.pkl

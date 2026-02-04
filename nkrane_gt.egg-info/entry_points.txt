@@ -1,0 +1,2 @@
+[console_scripts]
+nkrane-gt = nkrane_gt.cli:main
