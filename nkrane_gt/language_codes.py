@@ -8,6 +8,7 @@ LANGUAGE_CODE_MAPPING = {
     'eng': 'en',
     'spa': 'es',
     'fra': 'fr',
+    'tha': 'th',  # Thai
     
     # Ghanaian languages
     'twi': 'ak',  # Akan/Twi (using 'ak' for Google)
@@ -69,7 +70,7 @@ def is_google_supported(lang_code: str) -> bool:
     supported_codes = {
         'en', 'es', 'fr', 'de', 'zh', 'ja', 'ko', 'ru', 'ar', 'hi',
         'pt', 'it', 'nl', 'pl', 'sv', 'da', 'fi', 'el', 'cs', 'ro',
-        'hu', 'sk', 'bg', 'sl', 'lt', 'lv', 'et', 'mt',
+        'hu', 'sk', 'bg', 'sl', 'lt', 'lv', 'et', 'mt', 'th',
         
         # African languages
         'ak',  # Twi/Akan

@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 class NkraneTranslator:
     def __init__(self, target_lang: str, src_lang: str = 'en', 
-                 terminology_source: str = None, use_builtin: bool = True):
+                 terminology_source: str = None, use_builtin: bool = True,
+                 use_pivot: bool = True, pivot_lang: str = 'th'):
         """
         Initialize Nkrane Translator.
 
@@ -21,10 +22,14 @@ class NkraneTranslator:
             src_lang: Source language code (default: 'en')
             terminology_source: Path to user's terminology CSV file (optional)
             use_builtin: Whether to use built-in dictionary (default: True)
+            use_pivot: Whether to use pivot translation (default: True)
+            pivot_lang: Pivot language code (default: 'th' for Thai)
         """
         self.target_lang = target_lang
         self.src_lang = src_lang
         self.use_builtin = use_builtin
+        self.use_pivot = use_pivot
+        self.pivot_lang = pivot_lang
 
         # Initialize terminology manager
         self.terminology_manager = TerminologyManager(
@@ -36,6 +41,7 @@ class NkraneTranslator:
         # Convert language codes to Google format
         self.src_lang_google = convert_lang_code(src_lang, to_google=True)
         self.target_lang_google = convert_lang_code(target_lang, to_google=True)
+        self.pivot_lang_google = convert_lang_code(pivot_lang, to_google=True)
 
         # Check if Google Translate supports these languages
         if not is_google_supported(src_lang):
@@ -44,23 +50,41 @@ class NkraneTranslator:
         if not is_google_supported(target_lang):
             logger.warning(f"Target language '{target_lang}' may not be supported by Google Translate")
 
+        if use_pivot and not is_google_supported(pivot_lang):
+            logger.warning(f"Pivot language '{pivot_lang}' may not be supported by Google Translate")
+
         # Log terminology stats
         stats = self.terminology_manager.get_terms_count()
         logger.info(f"Terminology loaded: {stats['total']} total terms "
                    f"({stats['builtin']} built-in, {stats['user']} user)")
+        
+        if use_pivot:
+            logger.info(f"Using pivot translation: {src_lang} → {pivot_lang} → {target_lang}")
 
-    def _google_translate_sync(self, text: str) -> str:
+    def _google_translate_sync(self, text: str, src_lang: str = None, tgt_lang: str = None) -> str:
         """
         Synchronous Google Translate using requests.
         Uses the same endpoint that googletrans library uses.
+        
+        Args:
+            text: Text to translate
+            src_lang: Source language (uses self.src_lang_google if not provided)
+            tgt_lang: Target language (uses self.target_lang_google if not provided)
+            
+        Returns:
+            Translated text
         """
+        # Use provided languages or fall back to instance defaults
+        source = src_lang if src_lang else self.src_lang_google
+        target = tgt_lang if tgt_lang else self.target_lang_google
+        
         # Google Translate web API endpoint (same one googletrans uses)
         url = "https://translate.googleapis.com/translate_a/single"
 
         params = {
             'client': 'gtx',
-            'sl': self.src_lang_google,
-            'tl': self.target_lang_google,
+            'sl': source,
+            'tl': target,
             'dt': 't',
             'q': text,
         }
@@ -113,8 +137,31 @@ class NkraneTranslator:
             logger.debug(f"Preprocessed text: {preprocessed_text}")
             logger.debug(f"Replacements: {list(replacements.keys())}")
 
-            # Step 2: Translate using synchronous Google Translate API
-            translated_with_placeholders = self._google_translate_sync(preprocessed_text)
+            # Step 2: Translate using Google Translate (with or without pivot)
+            if self.use_pivot:
+                # Two-step translation: source → pivot → target
+                logger.debug(f"Step 2a: Translating {self.src_lang} → {self.pivot_lang}")
+                pivot_translation = self._google_translate_sync(
+                    preprocessed_text, 
+                    src_lang=self.src_lang_google,
+                    tgt_lang=self.pivot_lang_google
+                )
+                logger.debug(f"Pivot translation: {pivot_translation}")
+                
+                # Small delay between requests to avoid rate limiting
+                time.sleep(0.3)
+                
+                logger.debug(f"Step 2b: Translating {self.pivot_lang} → {self.target_lang}")
+                translated_with_placeholders = self._google_translate_sync(
+                    pivot_translation,
+                    src_lang=self.pivot_lang_google,
+                    tgt_lang=self.target_lang_google
+                )
+            else:
+                # Direct translation: source → target
+                logger.debug(f"Direct translation: {self.src_lang} → {self.target_lang}")
+                translated_with_placeholders = self._google_translate_sync(preprocessed_text)
+                pivot_translation = None
 
             # Step 3: Postprocess - replace placeholders with translations
             final_text = self.terminology_manager.postprocess_text(
@@ -125,7 +172,7 @@ class NkraneTranslator:
 
             end_time = time.time()
 
-            return {
+            result = {
                 'text': final_text,
                 'src': self.src_lang,
                 'dest': self.target_lang,
@@ -136,8 +183,16 @@ class NkraneTranslator:
                 'src_google': self.src_lang_google,
                 'dest_google': self.target_lang_google,
                 'replaced_terms': list(replacements.keys()),
-                'translation_time': end_time - start_time
+                'translation_time': end_time - start_time,
+                'use_pivot': self.use_pivot
             }
+            
+            # Add pivot information if used
+            if self.use_pivot:
+                result['pivot_lang'] = self.pivot_lang
+                result['pivot_translation'] = pivot_translation
+            
+            return result
 
         except Exception as e:
             logger.error(f"Translation failed: {e}")
@@ -164,4 +219,3 @@ class NkraneTranslator:
                 })
 
         return results
-
