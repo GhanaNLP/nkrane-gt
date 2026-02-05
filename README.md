@@ -74,7 +74,7 @@ from nkrane_gt import NkraneTranslator
 
 # Initialize with your custom terminology
 translator = NkraneTranslator(
-    target_lang='ak',  # Akan/Twi
+    target_lang='ak',  # Akan/Twi (ak) or Ewe (ee) or Ga (gaa)
     terminology_source='my_terms.csv'
 )
 
